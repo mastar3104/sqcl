@@ -89,6 +89,11 @@ func DetectContext(input string) CompletionContext {
 			return ContextDatabase
 		}
 
+		// If previous token expects a column (WHERE, AND, OR, etc.) and current is a partial word
+		if columnContextKeywords[prevUpper] {
+			return ContextColumn
+		}
+
 		// ORDER BY, GROUP BY context
 		if prevUpper == "BY" && len(nonWS) >= 3 {
 			thirdLast := strings.ToUpper(nonWS[len(nonWS)-3].Value)
