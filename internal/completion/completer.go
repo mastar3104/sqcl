@@ -42,6 +42,7 @@ func (c *SQLCompleter) Do(line []rune, pos int) ([][]rune, int) {
 		candidates = c.getTableCandidates(ctx)
 	case ContextColumn:
 		candidates = c.getColumnCandidates(ctx, input)
+		candidates = append(candidates, c.getKeywordCandidates()...)
 	case ContextDatabase:
 		candidates = c.getDatabaseCandidates(ctx)
 	default:
