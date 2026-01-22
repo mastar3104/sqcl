@@ -5,6 +5,7 @@ Go製のターミナルSQLクライアント
 ## Features
 
 - **MySQL サポート** - MySQL データベースへの接続と操作
+- **接続設定の保存** - よく使う接続を名前をつけて保存・管理
 - **TAB キーによる自動補完** - SQLキーワード、テーブル名、カラム名を補完
 - **マルチライン入力** - `;` で終端するまで複数行にわたってSQLを入力可能
 - **コマンド履歴の永続化** - 履歴を保存し、次回起動時に復元
@@ -20,18 +21,38 @@ go install github.com/mastar3104/sqcl/cmd/sqcl@latest
 ## Usage
 
 ```bash
+# 直接接続
 sqcl -dsn 'user:pass@tcp(host:port)/dbname'
+
+# 保存済み接続を使用
+sqcl -c mydb
+```
+
+### 接続の保存・管理
+
+```bash
+# 接続を保存
+sqcl save mydb -dsn 'user:pass@tcp(host:port)/dbname'
+
+# 保存済み接続の一覧
+sqcl list
+
+# 保存済み接続を削除
+sqcl remove mydb
 ```
 
 ### コマンドラインオプション
 
 | フラグ | 説明 | デフォルト |
 |--------|------|-----------|
-| `-dsn` | 接続文字列 | (必須) |
+| `-dsn` | 接続文字列 | - |
+| `-c` | 保存済み接続名を指定 | - |
 | `-driver` | データベースドライバ | `mysql` |
 | `-history` | 履歴ファイルパス | `~/.sqlc_history` |
 | `-cache-ttl` | メタデータキャッシュTTL | `60s` |
 | `-version` | バージョン表示 | - |
+
+※ `-dsn` または `-c` のいずれかが必須
 
 ## 内部コマンド
 
@@ -64,6 +85,7 @@ sqcl -dsn 'user:pass@tcp(host:port)/dbname'
     ├── app/                  # アプリケーション設定・起動
     ├── cache/                # メタデータキャッシュ
     ├── completion/           # 自動補完ロジック
+    ├── connections/          # 接続設定の保存・管理
     ├── db/                   # データベース抽象化層
     │   └── mysql/            # MySQL実装
     ├── history/              # 履歴管理
