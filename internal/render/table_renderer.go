@@ -58,13 +58,6 @@ func (r *TableRenderer) renderTable(sb *strings.Builder, result *db.QueryResult)
 		}
 	}
 
-	// Apply max width limit
-	for i := range widths {
-		if widths[i] > r.MaxColWidth {
-			widths[i] = r.MaxColWidth
-		}
-	}
-
 	// Build separator line
 	separator := r.buildSeparator(widths)
 
@@ -94,11 +87,7 @@ func (r *TableRenderer) renderTable(sb *strings.Builder, result *db.QueryResult)
 func (r *TableRenderer) renderRow(sb *strings.Builder, values []string, widths []int, isHeader bool) {
 	sb.WriteString("|")
 	for i, val := range values {
-		// Truncate if necessary
 		display := val
-		if len(display) > widths[i] {
-			display = display[:widths[i]-3] + "..."
-		}
 
 		// Pad the value
 		padding := widths[i] - len(display)
