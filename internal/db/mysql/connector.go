@@ -142,3 +142,13 @@ func (c *Connector) executeExec(ctx context.Context, query string, start time.Ti
 		Duration:     time.Since(start),
 	}, nil
 }
+
+// GetCurrentDatabase returns the current database name.
+func (c *Connector) GetCurrentDatabase(ctx context.Context) (string, error) {
+	var name sql.NullString
+	err := c.db.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&name)
+	if err != nil {
+		return "", err
+	}
+	return name.String, nil
+}

@@ -6,24 +6,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mastar3104/sqcl/internal/cache"
 	"github.com/mastar3104/sqcl/internal/db"
 	"github.com/mastar3104/sqcl/internal/render"
 )
 
 // CommandHandler handles internal REPL commands.
 type CommandHandler struct {
-	connector db.Connector
-	cache     *cache.MetadataCache
-	renderer  *render.TableRenderer
+	repl *REPL
 }
 
 // NewCommandHandler creates a new command handler.
-func NewCommandHandler(connector db.Connector, cache *cache.MetadataCache, renderer *render.TableRenderer) *CommandHandler {
+func NewCommandHandler(repl *REPL) *CommandHandler {
 	return &CommandHandler{
-		connector: connector,
-		cache:     cache,
-		renderer:  renderer,
+		repl: repl,
 	}
 }
 
@@ -51,6 +46,8 @@ func (h *CommandHandler) Execute(cmd string, args []string) CommandResult {
 		return h.databasesCommand()
 	case "status":
 		return h.statusCommand()
+	case "format", "fmt":
+		return h.formatCommand(args)
 	default:
 		return CommandResult{Error: fmt.Errorf("unknown command: %s (type :help for available commands)", cmd)}
 	}
@@ -65,6 +62,7 @@ func (h *CommandHandler) helpCommand() CommandResult {
   :columns <table>    Show columns for a table
   :databases, :dbs    List all databases
   :status             Show connection status
+  :format, :fmt       Show/set output format (table, csv, json)
 
 SQL queries must end with a semicolon (;)
 Use TAB for auto-completion
@@ -73,7 +71,7 @@ Use Ctrl+C to cancel current input, Ctrl+D to exit`
 }
 
 func (h *CommandHandler) reloadCommand() CommandResult {
-	h.cache.Reload()
+	h.repl.Cache().Reload()
 	return CommandResult{Output: "Metadata cache reloaded"}
 }
 
@@ -81,7 +79,7 @@ func (h *CommandHandler) tablesCommand() CommandResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	tables, err := h.cache.GetTables(ctx)
+	tables, err := h.repl.Cache().GetTables(ctx)
 	if err != nil {
 		return CommandResult{Error: fmt.Errorf("failed to get tables: %w", err)}
 	}
@@ -98,7 +96,7 @@ func (h *CommandHandler) tablesCommand() CommandResult {
 		result.Rows = append(result.Rows, []interface{}{t})
 	}
 
-	output := h.renderer.Render(result)
+	output := h.repl.Renderer().Render(result)
 	return CommandResult{Output: output}
 }
 
@@ -111,7 +109,7 @@ func (h *CommandHandler) columnsCommand(args []string) CommandResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	columns, err := h.cache.GetColumns(ctx, tableName)
+	columns, err := h.repl.Cache().GetColumns(ctx, tableName)
 	if err != nil {
 		return CommandResult{Error: fmt.Errorf("failed to get columns: %w", err)}
 	}
@@ -142,7 +140,7 @@ func (h *CommandHandler) columnsCommand(args []string) CommandResult {
 		})
 	}
 
-	output := h.renderer.Render(result)
+	output := h.repl.Renderer().Render(result)
 	return CommandResult{Output: output}
 }
 
@@ -150,7 +148,7 @@ func (h *CommandHandler) databasesCommand() CommandResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	databases, err := h.cache.GetDatabases(ctx)
+	databases, err := h.repl.Cache().GetDatabases(ctx)
 	if err != nil {
 		return CommandResult{Error: fmt.Errorf("failed to get databases: %w", err)}
 	}
@@ -167,7 +165,7 @@ func (h *CommandHandler) databasesCommand() CommandResult {
 		result.Rows = append(result.Rows, []interface{}{d})
 	}
 
-	output := h.renderer.Render(result)
+	output := h.repl.Renderer().Render(result)
 	return CommandResult{Output: output}
 }
 
@@ -176,7 +174,7 @@ func (h *CommandHandler) statusCommand() CommandResult {
 	defer cancel()
 
 	status := "Connected"
-	if err := h.connector.Ping(ctx); err != nil {
+	if err := h.repl.Connector().Ping(ctx); err != nil {
 		status = fmt.Sprintf("Disconnected (%v)", err)
 	}
 
@@ -184,4 +182,33 @@ func (h *CommandHandler) statusCommand() CommandResult {
 	sb.WriteString(fmt.Sprintf("Connection Status: %s\n", status))
 
 	return CommandResult{Output: sb.String()}
+}
+
+func (h *CommandHandler) formatCommand(args []string) CommandResult {
+	if len(args) == 0 {
+		// Show current format
+		formatName := "table"
+		switch h.repl.GetFormat() {
+		case render.FormatCSV:
+			formatName = "csv"
+		case render.FormatJSON:
+			formatName = "json"
+		}
+		return CommandResult{Output: fmt.Sprintf("Current format: %s", formatName)}
+	}
+
+	format := strings.ToLower(args[0])
+	switch format {
+	case "table":
+		h.repl.SetFormat(render.FormatTable)
+		return CommandResult{Output: "Output format set to: table"}
+	case "csv":
+		h.repl.SetFormat(render.FormatCSV)
+		return CommandResult{Output: "Output format set to: csv"}
+	case "json":
+		h.repl.SetFormat(render.FormatJSON)
+		return CommandResult{Output: "Output format set to: json"}
+	default:
+		return CommandResult{Error: fmt.Errorf("unknown format: %s (available: table, csv, json)", format)}
+	}
 }

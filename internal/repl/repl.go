@@ -12,6 +12,7 @@ import (
 	"github.com/mastar3104/sqcl/internal/cache"
 	"github.com/mastar3104/sqcl/internal/completion"
 	"github.com/mastar3104/sqcl/internal/db"
+	"github.com/mastar3104/sqcl/internal/highlight"
 	"github.com/mastar3104/sqcl/internal/render"
 )
 
@@ -20,7 +21,8 @@ type REPL struct {
 	connector      db.Connector
 	cache          *cache.MetadataCache
 	dialect        db.Dialect
-	renderer       *render.TableRenderer
+	renderer       render.Renderer
+	outputFormat   render.OutputFormat
 	commandHandler *CommandHandler
 	historyFile    string
 	readline       *readline.Instance
@@ -36,10 +38,8 @@ type Config struct {
 
 // New creates a new REPL instance.
 func New(cfg Config) (*REPL, error) {
-	renderer := render.NewTableRenderer()
-	commandHandler := NewCommandHandler(cfg.Connector, cfg.Cache, renderer)
-
 	completer := completion.NewSQLCompleter(cfg.Cache, cfg.Dialect)
+	highlighter := highlight.NewSQLHighlighter(cfg.Dialect)
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:          "sqcl> ",
@@ -50,20 +50,24 @@ func New(cfg Config) (*REPL, error) {
 
 		HistorySearchFold:   true,
 		FuncFilterInputRune: filterInput,
+		Painter:             highlighter,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize readline: %w", err)
 	}
 
-	return &REPL{
-		connector:      cfg.Connector,
-		cache:          cfg.Cache,
-		dialect:        cfg.Dialect,
-		renderer:       renderer,
-		commandHandler: commandHandler,
-		historyFile:    cfg.HistoryFile,
-		readline:       rl,
-	}, nil
+	r := &REPL{
+		connector:    cfg.Connector,
+		cache:        cfg.Cache,
+		dialect:      cfg.Dialect,
+		renderer:     render.NewTableRenderer(),
+		outputFormat: render.FormatTable,
+		historyFile:  cfg.HistoryFile,
+		readline:     rl,
+	}
+	r.commandHandler = NewCommandHandler(r)
+
+	return r, nil
 }
 
 // Run starts the REPL loop.
@@ -77,7 +81,7 @@ func (r *REPL) Run() error {
 	accumulator := NewInputAccumulator()
 
 	for {
-		prompt := "sqcl> "
+		prompt := r.getPrompt()
 		if !accumulator.IsEmpty() {
 			prompt = "   -> "
 		}
@@ -162,6 +166,50 @@ func (r *REPL) Close() error {
 		return r.readline.Close()
 	}
 	return nil
+}
+
+// SetFormat changes the output format.
+func (r *REPL) SetFormat(format render.OutputFormat) {
+	r.outputFormat = format
+	switch format {
+	case render.FormatCSV:
+		r.renderer = render.NewCSVRenderer()
+	case render.FormatJSON:
+		r.renderer = render.NewJSONRenderer()
+	default:
+		r.renderer = render.NewTableRenderer()
+	}
+}
+
+// GetFormat returns the current output format.
+func (r *REPL) GetFormat() render.OutputFormat {
+	return r.outputFormat
+}
+
+// Cache returns the metadata cache.
+func (r *REPL) Cache() *cache.MetadataCache {
+	return r.cache
+}
+
+// Connector returns the database connector.
+func (r *REPL) Connector() db.Connector {
+	return r.connector
+}
+
+// Renderer returns the current renderer.
+func (r *REPL) Renderer() render.Renderer {
+	return r.renderer
+}
+
+func (r *REPL) getPrompt() string {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	dbName, err := r.connector.GetCurrentDatabase(ctx)
+	if err != nil || dbName == "" {
+		return "sqcl> "
+	}
+	return fmt.Sprintf("sqcl(%s)> ", dbName)
 }
 
 func filterInput(r rune) (rune, bool) {

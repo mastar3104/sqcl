@@ -12,6 +12,7 @@ type Connector interface {
 	Execute(ctx context.Context, query string) (*QueryResult, error)
 	Ping(ctx context.Context) error
 	DB() *sql.DB
+	GetCurrentDatabase(ctx context.Context) (string, error)
 }
 
 // MetadataProvider defines the interface for retrieving database metadata.
