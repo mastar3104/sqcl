@@ -70,7 +70,8 @@ sqcl remove mydb
 
 | キー | 説明 |
 |------|------|
-| `TAB` | 自動補完 |
+| `TAB` | 自動補完（次の候補） |
+| `Shift+TAB` | 自動補完（前の候補） |
 | `Ctrl+C` | 入力キャンセル |
 | `Ctrl+D` | 終了 |
 
@@ -96,6 +97,7 @@ sqcl remove mydb
 ## 依存関係
 
 - [github.com/chzyer/readline](https://github.com/chzyer/readline) - 行編集・履歴・補完
+  - ※ Shift+Tab対応のため、ローカルでフォーク版を使用 (`vendor/github.com/chzyer/readline`)
 - [github.com/go-sql-driver/mysql](https://github.com/go-sql-driver/mysql) - MySQL ドライバ
 
 ## License

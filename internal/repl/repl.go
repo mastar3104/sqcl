@@ -48,9 +48,10 @@ func New(cfg Config) (*REPL, error) {
 		InterruptPrompt: "^C",
 		EOFPrompt:       "exit",
 
-		HistorySearchFold:   true,
-		FuncFilterInputRune: filterInput,
-		Painter:             highlighter,
+		HistorySearchFold:      true,
+		FuncFilterInputRune:    filterInput,
+		Painter:                highlighter,
+		DisableAutoSaveHistory: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize readline: %w", err)
@@ -117,6 +118,7 @@ func (r *REPL) Run() error {
 
 		// Handle internal commands (only when not accumulating)
 		if accumulator.IsEmpty() && IsInternalCommand(line) {
+			r.readline.SaveHistory(line)
 			cmd, args := ParseCommand(line)
 			result := r.commandHandler.Execute(cmd, args)
 
@@ -140,6 +142,10 @@ func (r *REPL) Run() error {
 		if accumulator.IsComplete() {
 			query := accumulator.Get()
 			accumulator.Clear()
+
+			// 改行を空白に置換して1行形式で履歴に保存
+			historyEntry := strings.Join(strings.Fields(query), " ")
+			r.readline.SaveHistory(historyEntry)
 
 			r.executeQuery(query)
 		}
