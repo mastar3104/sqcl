@@ -11,6 +11,7 @@ Go製のターミナルSQLクライアント
 - **コマンド履歴の永続化** - 履歴を保存し、次回起動時に復元
 - **テーブル形式の出力** - クエリ結果を見やすいテーブル形式で表示
 - **内部コマンド** - データベースのメタ情報を簡単に取得
+- **プレースホルダー対応** - `?` を使ったパラメータ化クエリをインタラクティブに実行
 
 ## Installation
 
@@ -75,6 +76,44 @@ sqcl remove mydb
 | `Ctrl+C` | 入力キャンセル |
 | `Ctrl+D` | 終了 |
 
+## プレースホルダー
+
+SQL文中の `?` はプレースホルダーとして認識され、実行前に値の入力を求められます。
+
+```
+sqcl(mydb)> SELECT * FROM users WHERE status = ? AND age > ?;
+
+Query: SELECT * FROM users WHERE status = ? AND age > ?
+Enter values for 2 placeholder(s):
+  (Press Enter for NULL, Ctrl+C to cancel)
+
+  [1]> active
+  [2]> 18
+
++----+-------+--------+-----+
+| id | name  | status | age |
++----+-------+--------+-----+
+| 1  | Alice | active | 25  |
++----+-------+--------+-----+
+1 row(s) in set
+Time: 12.345ms
+```
+
+### 型推論
+
+| 入力 | 変換結果 |
+|-----|---------|
+| (空入力) | `NULL` |
+| `NULL` | `NULL` |
+| `123` | 整数 |
+| `3.14` | 浮動小数点 |
+| `hello` | 文字列 |
+
+### 注意事項
+
+- 文字列リテラル内の `?` (`'text?'`) はプレースホルダーとして認識されません
+- バッククォート内 (`` `col?` ``) やダブルクォート内 (`"col?"`) も同様です
+
 ## プロジェクト構造
 
 ```
@@ -90,6 +129,7 @@ sqcl remove mydb
     ├── db/                   # データベース抽象化層
     │   └── mysql/            # MySQL実装
     ├── history/              # 履歴管理
+    ├── placeholder/          # プレースホルダー検出・入力処理
     ├── render/               # 出力フォーマッタ
     └── repl/                 # REPL・コマンド処理
 ```
@@ -97,7 +137,6 @@ sqcl remove mydb
 ## 依存関係
 
 - [github.com/chzyer/readline](https://github.com/chzyer/readline) - 行編集・履歴・補完
-  - ※ Shift+Tab対応のため、ローカルでフォーク版を使用 (`vendor/github.com/chzyer/readline`)
 - [github.com/go-sql-driver/mysql](https://github.com/go-sql-driver/mysql) - MySQL ドライバ
 
 ## License
