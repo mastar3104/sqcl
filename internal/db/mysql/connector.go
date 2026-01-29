@@ -152,3 +152,84 @@ func (c *Connector) GetCurrentDatabase(ctx context.Context) (string, error) {
 	}
 	return name.String, nil
 }
+
+// ExecuteWithParams runs a SQL query with parameters and returns the result.
+func (c *Connector) ExecuteWithParams(ctx context.Context, query string, args []interface{}) (*db.QueryResult, error) {
+	start := time.Now()
+
+	trimmed := strings.TrimSpace(strings.ToUpper(query))
+	isSelect := strings.HasPrefix(trimmed, "SELECT") ||
+		strings.HasPrefix(trimmed, "SHOW") ||
+		strings.HasPrefix(trimmed, "DESCRIBE") ||
+		strings.HasPrefix(trimmed, "DESC") ||
+		strings.HasPrefix(trimmed, "EXPLAIN")
+
+	if isSelect {
+		return c.executeQueryWithParams(ctx, query, args, start)
+	}
+	return c.executeExecWithParams(ctx, query, args, start)
+}
+
+func (c *Connector) executeQueryWithParams(ctx context.Context, query string, args []interface{}, start time.Time) (*db.QueryResult, error) {
+	rows, err := c.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	var resultRows [][]interface{}
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			return nil, err
+		}
+
+		row := make([]interface{}, len(columns))
+		for i, v := range values {
+			if b, ok := v.([]byte); ok {
+				row[i] = string(b)
+			} else {
+				row[i] = v
+			}
+		}
+		resultRows = append(resultRows, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &db.QueryResult{
+		Columns:  columns,
+		Rows:     resultRows,
+		IsSelect: true,
+		Duration: time.Since(start),
+	}, nil
+}
+
+func (c *Connector) executeExecWithParams(ctx context.Context, query string, args []interface{}, start time.Time) (*db.QueryResult, error) {
+	result, err := c.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	lastInsertID, _ := result.LastInsertId()
+
+	return &db.QueryResult{
+		RowsAffected: rowsAffected,
+		LastInsertID: lastInsertID,
+		IsSelect:     false,
+		Duration:     time.Since(start),
+	}, nil
+}

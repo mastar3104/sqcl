@@ -10,6 +10,7 @@ type Connector interface {
 	Connect(ctx context.Context, dsn string) error
 	Close() error
 	Execute(ctx context.Context, query string) (*QueryResult, error)
+	ExecuteWithParams(ctx context.Context, query string, args []interface{}) (*QueryResult, error)
 	Ping(ctx context.Context) error
 	DB() *sql.DB
 	GetCurrentDatabase(ctx context.Context) (string, error)
