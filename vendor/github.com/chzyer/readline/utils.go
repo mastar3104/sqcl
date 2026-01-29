@@ -115,8 +115,6 @@ func escapeExKey(key *escapeKeyPair) rune {
 		r = CharLineStart
 	case 'F':
 		r = CharLineEnd
-	case 'Z':
-		r = CharBackward // Shift+Tab → 前の候補に戻る
 	case '~':
 		if key.attr == "3" {
 			r = CharDelete

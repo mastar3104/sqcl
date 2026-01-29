@@ -13,6 +13,7 @@ import (
 	"github.com/mastar3104/sqcl/internal/completion"
 	"github.com/mastar3104/sqcl/internal/db"
 	"github.com/mastar3104/sqcl/internal/highlight"
+	"github.com/mastar3104/sqcl/internal/placeholder"
 	"github.com/mastar3104/sqcl/internal/render"
 )
 
@@ -156,7 +157,28 @@ func (r *REPL) executeQuery(query string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	result, err := r.connector.Execute(ctx, query)
+	// Detect placeholders
+	count := placeholder.CountPlaceholders(query)
+
+	var result *db.QueryResult
+	var err error
+
+	if count > 0 {
+		// Prompt for values
+		values, cancelled, promptErr := placeholder.PromptForValues(r.readline, count, query)
+		if promptErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", promptErr)
+			return
+		}
+		if cancelled {
+			fmt.Println("Query cancelled")
+			return
+		}
+		result, err = r.connector.ExecuteWithParams(ctx, query, values)
+	} else {
+		result, err = r.connector.Execute(ctx, query)
+	}
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
