@@ -122,6 +122,7 @@ func runConnect() {
 	dsn := flag.String("dsn", "", "Database connection string (e.g., 'user:pass@tcp(host:port)/dbname')")
 	driver := flag.String("driver", "mysql", "Database driver (mysql)")
 	connectionName := flag.String("c", "", "Use saved connection by name")
+	query := flag.String("e", "", "Execute the given SQL and exit")
 	historyFile := flag.String("history", history.GetHistoryFilePath(), "History file path")
 	cacheTTL := flag.Duration("cache-ttl", 60*time.Second, "Metadata cache TTL")
 	showVersion := flag.Bool("version", false, "Show version and exit")
@@ -131,6 +132,7 @@ func runConnect() {
 		fmt.Fprintf(os.Stderr, "Usage:\n")
 		fmt.Fprintf(os.Stderr, "  sqcl -dsn 'user:pass@tcp(host:port)/dbname'\n")
 		fmt.Fprintf(os.Stderr, "  sqcl -c <connection_name>\n")
+		fmt.Fprintf(os.Stderr, "  sqcl -c <connection_name> -e 'SELECT ...'\n")
 		fmt.Fprintf(os.Stderr, "  sqcl save <name> -dsn 'connection_string'\n")
 		fmt.Fprintf(os.Stderr, "  sqcl list\n")
 		fmt.Fprintf(os.Stderr, "  sqcl remove <name>\n\n")
@@ -178,6 +180,7 @@ func runConnect() {
 		Driver:      actualDriver,
 		HistoryFile: *historyFile,
 		CacheTTL:    *cacheTTL,
+		Query:       *query,
 	}
 
 	application, err := app.New(config)

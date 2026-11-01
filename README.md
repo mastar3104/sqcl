@@ -27,6 +27,9 @@ sqcl -dsn 'user:pass@tcp(host:port)/dbname'
 
 # 保存済み接続を使用
 sqcl -c mydb
+
+# ワンライナーでSQLを実行して終了
+sqcl -c mydb -e 'SELECT * FROM users LIMIT 10'
 ```
 
 ### 接続の保存・管理
@@ -48,12 +51,14 @@ sqcl remove mydb
 |--------|------|-----------|
 | `-dsn` | 接続文字列 | - |
 | `-c` | 保存済み接続名を指定 | - |
+| `-e` | 指定したSQLを実行して終了（REPLを起動しない） | - |
 | `-driver` | データベースドライバ | `mysql` |
 | `-history` | 履歴ファイルパス | `~/.sqlc_history` |
 | `-cache-ttl` | メタデータキャッシュTTL | `60s` |
 | `-version` | バージョン表示 | - |
 
 ※ `-dsn` または `-c` のいずれかが必須
+※ `-e` ではプレースホルダー (`?`) は使用できません
 
 ## 内部コマンド
 

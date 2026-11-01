@@ -12,6 +12,7 @@ type Config struct {
 	Driver       string
 	HistoryFile  string
 	CacheTTL     time.Duration
+	Query        string // 指定時はREPLを起動せずこのSQLを実行して終了する
 }
 
 // DefaultConfig returns the default configuration.
