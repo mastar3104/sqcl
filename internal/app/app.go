@@ -13,12 +13,15 @@ import (
 	"github.com/mastar3104/sqcl/internal/db"
 	"github.com/mastar3104/sqcl/internal/db/mysql"
 	"github.com/mastar3104/sqcl/internal/history"
+	"github.com/mastar3104/sqcl/internal/placeholder"
+	"github.com/mastar3104/sqcl/internal/render"
 	"github.com/mastar3104/sqcl/internal/repl"
 )
 
 var (
 	ErrDSNRequired      = errors.New("DSN is required")
 	ErrUnsupportedDriver = errors.New("unsupported database driver")
+	ErrPlaceholderInQuery = errors.New("placeholders (?) are not supported with -e")
 )
 
 // App represents the main application.
@@ -53,6 +56,10 @@ func (a *App) Run() error {
 		cancel()
 	}()
 
+	if a.config.Query != "" {
+		return a.runQuery(ctx)
+	}
+
 	// Initialize components
 	if err := a.initialize(ctx); err != nil {
 		return fmt.Errorf("initialization failed: %w", err)
@@ -63,8 +70,31 @@ func (a *App) Run() error {
 	return a.repl.Run()
 }
 
-func (a *App) initialize(ctx context.Context) error {
-	// Create connector based on driver
+// runQuery executes a single query and prints the result without starting the REPL.
+func (a *App) runQuery(ctx context.Context) error {
+	if placeholder.CountPlaceholders(a.config.Query) > 0 {
+		return ErrPlaceholderInQuery
+	}
+
+	if _, err := a.connect(ctx); err != nil {
+		return err
+	}
+	defer a.cleanup()
+
+	queryCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	result, err := a.connector.Execute(queryCtx, a.config.Query)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(render.NewTableRenderer().Render(result))
+	return nil
+}
+
+// connect creates a connector for the configured driver and connects to the database.
+func (a *App) connect(ctx context.Context) (db.Dialect, error) {
 	var connector db.Connector
 	var dialect db.Dialect
 
@@ -73,22 +103,29 @@ func (a *App) initialize(ctx context.Context) error {
 		connector = mysql.NewConnector()
 		dialect = mysql.NewDialect()
 	default:
-		return fmt.Errorf("%w: %s", ErrUnsupportedDriver, a.config.Driver)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDriver, a.config.Driver)
 	}
 
-	// Connect to database
 	connectCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	if err := connector.Connect(connectCtx, a.config.DSN); err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	a.connector = connector
+	return dialect, nil
+}
+
+func (a *App) initialize(ctx context.Context) error {
+	dialect, err := a.connect(ctx)
+	if err != nil {
+		return err
+	}
 
 	// Create metadata provider
 	switch a.config.Driver {
 	case "mysql":
-		a.metadata = mysql.NewMetadataProvider(connector.DB())
+		a.metadata = mysql.NewMetadataProvider(a.connector.DB())
 	}
 	a.dialect = dialect
 
